@@ -1,0 +1,446 @@
+.data  
+message: .asciiz  "Please choosen between e(encryption) and d(decription):\n "  # define a message to print it on screen 
+value : .byte        # the value for charachter
+messageFileEnc: .asciiz  "Please input the name of the plain text file: \n"
+messageFileDec: .asciiz  "Please input the name of the  cipher text file: \n"
+fileText: .space 1024
+fileTextAlpha: .space 1024
+userInput: .space 1024 #size of input each word 4 byte so 25 word the assembler can recive
+fileName: .space 1024
+CipherfileName: .space 100
+CipherfileName1: .space 100
+str1:  .asciiz "Enter string: "
+str2:  .asciiz "The Value is:\n "
+str3:  .asciiz "Wrong Value Try again!!"
+b:  .asciiz "\n"
+key : .byte 0
+.text
+main:
+#---------------------------Start with main function--------------------------
+chose:
+   li $v0,4 # start to read a message 
+   la $a0, message 
+   syscall 
+   li $v0,12  # vo contain the value that read it from user
+   syscall 
+   move $t0,$v0       # the value that read it from user move it to t0
+    li $v0,11
+   lb $a0,b
+   syscall 
+   beq  $t0,'e' ,Enc
+   beq  $t0,'d' ,Dec 
+   bne  $t0,'e' ,chose
+   bne  $t0,'d' ,chose
+
+#-------------------------Encryption function------------------------
+Enc: 
+   la $a0,b # for the new line 
+   li $v0,4
+    syscall
+    la $a0, messageFileEnc    # Load and print string asking for string
+    li $v0, 4
+    syscall
+
+    li $v0, 8       # take in input
+    la $a0, userInput  # load byte space into address
+    li $a1, 100      # allot the byte space for string
+    syscall
+    move $s0, $a0   # save string to s0
+
+    li $v0, 4
+    li $t0, 0
+    
+    
+    li $v0, 0
+    la $a0, userInput
+    #Loop to capitalize
+    li $t2, 0
+    li $t3, 0
+    loop:
+    lb  $t1, userInput($t0)    #Load byte from 't0'th position in buffer into $t1
+    beq $t1, 0, write      #If ends, exit
+    beq $t1, '\n', not_lower  #If less than a, exit
+    sb $t1, fileName($t3)  #Store it back to 't0'th position in buffer
+    addi $t3, $t3, 1
+    addi $t0, $t0, 1
+     j loop
+    #if not lower, then increment $t0 and continue
+    not_lower:
+     addi $t0, $t0, 1
+    j loop
+	
+# after read the name of file then delete the \n on the end on file then start reading 
+   write:
+   li   $v0, 13          # system call for open file
+   la   $a0, fileName      # input file name
+   li   $a1, 0           # flag for reading
+   li   $a2, 0           # mode is ignored
+   syscall               # open a file 
+   move $s0, $v0         # save the file descriptor  
+
+#-----------------------Reading File ---------------------
+
+   li   $v0, 14        # system call for reading from file
+   move $a0, $s0       # file descriptor 
+   la   $a1, fileText    # address of buffer from which to read
+   li   $a2,  1024      # hardcoded buffer length
+   syscall             # read from file
+   j nonAlpha
+# ------------------- delele the NonAlpha Charachter--------------
+nonAlpha:
+    li $t0, 0
+    li $v0, 0
+    la $a0, fileText
+    li $t3, 0
+    loop1:
+    lb  $t1, fileText($t0)    #Load byte from 't0'th position in buffer into $t1
+    lb  $a0, fileText($t0) 
+    li $v0, 11
+    syscall 
+    beq $t1, 0, lowerCase      #If ends, exit
+    blt $t1, 'A', not_alpha  #If less than a, exit
+    bgt $t1, 'z', not_alpha
+    blt $t1, 'a', not_alpha1
+    sb $t1, fileTextAlpha($t3)  #Store it back to 't0'th position in buffer
+    addi $t3, $t3, 1
+    addi $t0, $t0, 1
+     j loop1
+    #if not lower, then increment $t0 and continue
+    not_alpha:
+     addi $t0, $t0, 1
+     beq $t1, '\n' ,  not_alpha2
+     beq $t1, 32 ,  not_alpha2
+    j loop1
+    
+     not_alpha1:
+    addi $t0, $t0, 1
+    blt $t1, 'Z',  not_alpha2
+    beq $t1, 'Z',  not_alpha2
+    j loop1
+    
+    not_alpha2:
+    sb $t1, fileTextAlpha($t3)  #Store it back to 't0'th position in buffer
+    addi $t3, $t3, 1
+    j loop1
+#------------------------Lower Case function-------------------
+lowerCase:
+la $a0, fileTextAlpha
+li $t0,0
+loop3:
+    lb $t1, fileTextAlpha($t0)
+    beq $t1, 0, end
+    blt $t1, 'A', case
+    bgt $t1, 'Z', case
+    addi $t1, $t1, 32
+    sb $t1, fileTextAlpha($t0)
+
+case: 
+    addi $t0, $t0, 1
+    j loop3
+#--------------------Shift Value function------------------
+Shiftvalue:
+    li $t1,0
+    la $t0,fileTextAlpha
+    li $t3,0
+    loop4:
+    lb   $a0,0($t0)
+    beq  $a0,' ',done
+    beq  $a0,'\n',done
+    beq  $a0,0,done1
+    addi $t0,$t0,1
+    addi $t1,$t1,1
+    j     loop4
+done:
+    bgt $t1,$t3,Move
+    li $t1,0
+    addi $t0,$t0,1
+    j loop4
+   
+Move:
+move  $t3,$t1
+li $t1,0
+addi $t0,$t0,1
+j loop4
+
+done1:
+    move $a0,$t3
+    la $t0,key
+    sb $a0,($t0)
+    lb $a0,key
+    li $v0 , 1 
+    syscall   
+    j encryption
+    
+end:
+# Printing File Content
+    lb $a0, b    # Load and print string asking for string
+    li $v0, 11
+    syscall
+    la $a0, str2    # Load and print string asking for string
+    li $v0, 4
+    syscall
+
+j Shiftvalue
+#-----------------------encryption function---------------------
+encryption:
+    #li $v0, 4
+    #la $a0, fileTextAlpha
+    #syscall
+    
+    lb $t3,key
+    li $t0, 0   
+loop5:
+    lb $t1, fileTextAlpha($t0)
+    beq $t1, 0, writeOnFile
+    beq $t1, '\n', case8
+    beq $t1, 32, case8
+    add $t1, $t1, $t3
+    bgt $t1,'z',case1
+    sb $t1, fileTextAlpha($t0)
+    addi $t0, $t0, 1
+    j loop5
+case8: 
+    sb $t1, fileTextAlpha($t0)
+    addi $t0, $t0, 1
+    j loop5
+    
+case1:
+    addi $t1,$t1,-26
+    sb $t1, fileTextAlpha($t0)
+    addi $t0, $t0, 1
+
+    j loop5
+exit:
+    li $v0, 11
+    lb $a0, b
+    syscall
+    
+    #li $v0, 4
+    #la $a0, fileTextAlpha
+    #syscall
+writeOnFile:
+   li $v0,4 # start to read a message 
+   la $a0, b 
+   syscall 
+   li $v0, 4
+   la $a0, messageFileDec # load byte space into address
+   syscall
+
+   li $v0, 8
+   la $a0, CipherfileName  # load byte space into address
+   li $a1, 100      # allot the byte space for string
+   syscall
+   li $t0, 0
+   li $v0, 0
+ #  la $a0, userInput
+    #Loop to capitalize
+    li $t2, 0
+    li $t3, 0
+    loop8:
+    lb  $t1, CipherfileName($t0)    #Load byte from 't0'th position in buffer into $t1
+    beq $t1, 0, write2     #If ends, exit
+    beq $t1, '\n', not_lower2 #If less than a, exit
+    sb $t1, CipherfileName1($t3)  #Store it back to 't0'th position in buffer
+    addi $t3, $t3, 1
+    addi $t0, $t0, 1
+     j loop8
+    #if not lower, then increment $t0 and continue
+not_lower2:
+    addi $t0, $t0, 1
+    j loop8   
+write2:
+   li   $v0, 13       # system call for open file
+   la   $a0, CipherfileName1    # output file name
+   li   $a1, 1        # Open for writing (flags are 0: read, 1: write)
+   li   $a2, 0        # mode is ignored
+   syscall            # open a file (file descriptor returned in $v0)
+   move $s6, $v0      # save the file descriptor 
+  
+#-----------------------Write on file -------------------- 	
+   li   $v0, 15       # system call for write to file
+   move $a0, $s6      # file descriptor 
+   la   $a1, fileTextAlpha   # address of buffer from which to write
+   li   $a2, 44       # hardcoded buffer length
+   syscall            # write to file
+
+  # Close the file 
+   li   $v0, 16       # system call for close file
+   move $a0, $s6      # file descriptor to close
+   syscall            # close file
+
+#-----------------End the program----------
+    li $v0, 10
+    syscall
+#------------------------------Decryption function---------------------
+Dec:
+   la $a0,b # for the new line 
+   li $v0,4
+   syscall 
+   la $a0, messageFileDec    # Load and print string asking for string
+   li $v0, 4
+   syscall
+   li $v0, 8       # take in input
+   la $a0, userInput  # load byte space into address
+   li $a1, 100      # allot the byte space for string
+   syscall
+   move $s0, $a0   # save string to s0
+
+   li $v0, 4
+   li $t0, 0
+
+   li $v0, 0
+   la $a0, userInput
+    #Loop to capitalize
+   li $t2, 0
+   li $t3, 0
+   loop10:
+   lb  $t1, userInput($t0)    #Load byte from 't0'th position in buffer into $t1
+   beq $t1, 0, read11     #If ends, exit
+   beq $t1, '\n', not_lower1 #If less than a, exit
+   sb $t1, fileName($t3)  #Store it back to 't0'th position in buffer
+   addi $t3, $t3, 1
+   addi $t0, $t0, 1
+   j loop10
+    #if not lower, then increment $t0 and continue
+not_lower1:
+   addi $t0, $t0, 1
+   j loop10
+	
+# Open file for reading
+read11:
+   li   $v0, 13          # system call for open file
+   la   $a0, fileName      # input file name
+   li   $a1, 0           # flag for reading
+   li   $a2, 0           # mode is ignored
+   syscall               # open a file 
+   move $s0, $v0         # save the file descriptor  
+# reading from file just opened
+
+   li   $v0, 14        # system call for reading from file
+   move $a0, $s0       # file descriptor 
+   la   $a1, fileText    # address of buffer from which to read
+   li   $a2,  1024      # hardcoded buffer length
+   syscall             # read from file
+   j Shiftvalue1
+Shiftvalue1:
+   li $t1,0
+   la $t0,fileText
+   li $t3,0
+   loop11:
+   lb   $a0,0($t0)
+   beq  $a0,' ',done2
+   beq  $a0,'\n',done2
+   beq  $a0,0,done3
+   addi $t0,$t0,1
+   addi $t1,$t1,1
+   j     loop11
+done2:
+   bgt $t1,$t3,Move1
+   li $t1,0
+   addi $t0,$t0,1
+   j loop11
+   
+Move1:
+   move  $t3,$t1
+   li $t1,0
+   addi $t0,$t0,1
+   j loop11
+
+done3:
+    la $a0, str2    # Load and print string asking for string
+    li $v0, 4
+    syscall
+   move $a0,$t3
+   la $t0,key
+   sb $a0,($t0)
+   lb $a0,key
+   li $v0 , 1 
+   syscall   
+     la $a0, b    # Load and print string asking for string
+    li $v0, 4
+    syscall
+   j  decreption
+
+decreption:
+  li $v0, 4
+  la $a0, fileText
+  syscall
+    
+  lb $t3,key
+  li $t0, 0   
+loop12:
+  lb $t1, fileText($t0)
+  beq $t1, 0, writeDecText
+  beq $t1, '\n', case9
+  beq $t1, 32, case9
+  sub $t1, $t1, $t3
+  blt $t1,'a',case10
+  sb $t1, fileText($t0)
+  addi $t0, $t0, 1
+  j loop12
+case9: 
+  sb $t1, fileText($t0)
+  addi $t0, $t0, 1
+  j loop12
+    
+case10:
+    addi $t1,$t1,26
+    sb $t1, fileText($t0)
+    addi $t0, $t0, 1
+    j loop12
+writeDecText:
+    la $a0, b    # Load and print string asking for string
+    li $v0, 4
+    syscall
+
+    la $a0, messageFileEnc    # Load and print string asking for string
+    li $v0, 4
+    syscall
+    li $v0, 8       # take in input
+    la $a0, userInput  # load byte space into address
+    li $a1, 100      # allot the byte space for string
+    syscall
+    move $s0, $a0   # save string to s0
+
+    li $v0, 4
+    li $t0, 0
+    
+    
+    li $v0, 0
+    la $a0, userInput
+    #Loop to capitalize
+    li $t2, 0
+    li $t3, 0
+    loop13:
+    lb  $t1, userInput($t0)    #Load byte from 't0'th position in buffer into $t1
+    beq $t1, 0, writeDecTextFile     #If ends, exit
+    beq $t1, '\n', not_lower13#If less than a, exit
+    sb $t1, fileName($t3)  #Store it back to 't0'th position in buffer
+    addi $t3, $t3, 1
+    addi $t0, $t0, 1
+     j loop13
+    #if not lower, then increment $t0 and continue
+    not_lower13:
+     addi $t0, $t0, 1
+    j loop13
+
+writeDecTextFile:
+  li   $v0, 13       # system call for open file
+  la   $a0, fileName    # output file name
+  li   $a1, 1        # Open for writing (flags are 0: read, 1: write)
+  li   $a2, 0        # mode is ignored
+  syscall            # open a file (file descriptor returned in $v0)
+  move $s6, $v0      # save the file descriptor 
+  # Write to file just opened
+  li   $v0, 15       # system call for write to file
+  move $a0, $s6      # file descriptor 
+  la   $a1, fileText   # address of buffer from which to write
+  li   $a2, 44       # hardcoded buffer length
+  syscall            # write to file
+  # Close the file 
+  li   $v0, 16       # system call for close file
+  move $a0, $s6      # file descriptor to close
+  syscall            # close file
+ #---------------------End the program 
+  li   $v0, 10 
+   syscall 
